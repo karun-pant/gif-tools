@@ -62,12 +62,16 @@ jobs:
          echo "Creating new release with tag: $NEW_TAG"
          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
          
-         # Create a new release using GitHub API
-         curl -X POST \
-           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-           -H "Accept: application/vnd.github.v3+json" \
-           https://api.github.com/repos/${{ github.repository }}/releases \
-           -d "{\"tag_name\":\"$NEW_TAG\",\"name\":\"Release $NEW_TAG\",\"body\":\"Automated release $NEW_TAG\",\"draft\":false,\"prerelease\":false}"
+         # Create a new tag
+         git config --global user.name "GitHub Actions"
+         git config --global user.email "actions@github.com"
+         git tag $NEW_TAG
+         git push origin $NEW_TAG
+         
+         # Create a new release using GitHub CLI
+         gh release create $NEW_TAG --title "Release $NEW_TAG" --notes "Automated release $NEW_TAG"
+       env:
+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
      - name: Build Mac App
        run: |
@@ -77,41 +81,21 @@ jobs:
          pyinstaller FrameGifTool.spec
          cd dist
          zip -r FrameGifTool-Mac.zip FrameGifTool.app
+         echo "ZIP_PATH=$(pwd)/FrameGifTool-Mac.zip" >> $GITHUB_ENV
+         cd ..
      
-     - name: Upload artifact
-
-       uses: actions/upload-artifact@v3
-       with:
-         name: FrameGifTool-Mac
-         path: ./dist/FrameGifTool-Mac.zip
-    
-     - name: Upload Release Asset (on push to main)
+     - name: Upload to Release (on push to main)
        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-
-
-
-
-
-
-
-
-
-
-
-
-       uses: softprops/action-gh-release@v1
-       with:
-         files: ./dist/FrameGifTool-Mac.zip
-         tag_name: ${{ env.NEW_TAG }}
-    
-     - name: Upload Release Asset (on release created)
-       if: github.event_name == 'release'
-       uses: actions/upload-release-asset@v1
+       run: |
+         # Upload the asset to the release
+         gh release upload ${{ env.NEW_TAG }} ${{ env.ZIP_PATH }}
        env:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       with:
-         upload_url: ${{ github.event.release.upload_url }}
-         asset_path: ./dist/FrameGifTool-Mac.zip
-         asset_name: FrameGifTool-Mac.zip
-         asset_content_type: application/zip
+    
+     - name: Upload to Release (on release created)
+       if: github.event_name == 'release'
+       run: |
+         # Upload the asset to the release
+         gh release upload ${{ github.event.release.tag_name }} ${{ env.ZIP_PATH }}
+       env:
+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
