@@ -5,12 +5,34 @@ import threading
 import subprocess
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QLineEdit, QPushButton, QProgressBar, QFileDialog, 
-                            QMessageBox, QGroupBox)
+                            QMessageBox, QGroupBox, QSizePolicy)
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QFont, QColor, QPalette
 from PIL import Image, ImageDraw, ImageSequence
 import io
 import pkg_resources
+
+# Color palette - Easy to customize
+class AppColors:
+    # Primary brand color (Cherry Red)
+    PRIMARY = "#DE3163"
+    # Darker shade of primary for hover effects
+    PRIMARY_DARK = "#C42B56"
+    # Lighter shade of primary for backgrounds
+    PRIMARY_LIGHT = "#F5D6E0"
+    # Secondary color for accents
+    SECONDARY = "#4A90E2"
+    # Text colors
+    TEXT_DARK = "#333333"
+    TEXT_LIGHT = "#FFFFFF"
+    # Background colors
+    BG_LIGHT = "#FFFFFF"
+    BG_MEDIUM = "#F5F5F5"
+    BG_DARK = "#E0E0E0"
+    # Success, warning, error colors
+    SUCCESS = "#4CAF50"
+    WARNING = "#FFC107"
+    ERROR = "#F44336"
 
 def add_rounded_corners(im, radius):
     circle = Image.new('L', (radius * 2, radius * 2), 0)
@@ -118,10 +140,78 @@ class FrameGifApp(QMainWindow):
         
         # Try to find the frame.png in different locations
         self.frame_path = self.find_frame_png()
+        self.logo_path = self.find_logo_png()
         self.gif_path = ""
         self.output_path = os.path.join(os.path.expanduser("~"), 'framed.gif')
         
+        # Apply global stylesheet
+        self.apply_stylesheet()
+        
         self.init_ui()
+        
+    def apply_stylesheet(self):
+        # Global application stylesheet
+        self.setStyleSheet(f"""
+            QMainWindow, QWidget {{
+                background-color: {AppColors.BG_LIGHT};
+                color: {AppColors.TEXT_DARK};
+            }}
+            
+            QGroupBox {{
+                font-weight: bold;
+                border: 1px solid {AppColors.BG_DARK};
+                border-radius: 6px;
+                margin-top: 12px;
+                padding-top: 12px;
+            }}
+            
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+                color: {AppColors.PRIMARY};
+            }}
+            
+            QPushButton {{
+                background-color: {AppColors.PRIMARY};
+                color: {AppColors.TEXT_LIGHT};
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                border: none;
+            }}
+            
+            QPushButton:hover {{
+                background-color: {AppColors.PRIMARY_DARK};
+            }}
+            
+            QPushButton:pressed {{
+                background-color: {AppColors.PRIMARY_DARK};
+                padding: 9px 15px 7px 17px;
+            }}
+            
+            QLineEdit {{
+                padding: 6px;
+                border: 1px solid {AppColors.BG_DARK};
+                border-radius: 4px;
+            }}
+            
+            QLineEdit:focus {{
+                border: 1px solid {AppColors.PRIMARY};
+            }}
+            
+            QProgressBar {{
+                border: 1px solid {AppColors.BG_DARK};
+                border-radius: 4px;
+                text-align: center;
+                height: 20px;
+            }}
+            
+            QProgressBar::chunk {{
+                background-color: {AppColors.PRIMARY};
+                border-radius: 3px;
+            }}
+        """)
         
     def find_frame_png(self):
         # First check if frame.png is in the current directory
@@ -146,74 +236,154 @@ class FrameGifApp(QMainWindow):
                 
         # Default to the current directory and show a warning later if not found
         return os.path.join(self.script_dir, 'frame.png')
+    
+    def find_logo_png(self):
+        # Check if logo.png is in the current directory
+        local_logo = os.path.join(self.script_dir, 'logo.png')
+        if os.path.exists(local_logo):
+            return local_logo
+            
+        # If running as a bundled app, check relative to the executable
+        if getattr(sys, 'frozen', False):
+            bundle_dir = os.path.dirname(sys.executable)
+            bundled_logo = os.path.join(bundle_dir, 'logo.png')
+            if os.path.exists(bundled_logo):
+                return bundled_logo
+                
+        # Default to the current directory
+        return os.path.join(self.script_dir, 'logo.png')
         
     def init_ui(self):
         self.setWindowTitle("GIF Framing Tool")
-        self.setMinimumSize(600, 300)  # Reduced size since we removed the preview
+        self.setMinimumSize(600, 400)  # Increased height for the header
         
         # Main widget and layout
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
+        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Header with logo and text
+        header_widget = QWidget()
+        header_widget.setStyleSheet(f"background-color: {AppColors.PRIMARY_LIGHT}; border-radius: 8px;")
+        header_layout = QVBoxLayout(header_widget)
+        header_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Logo
+        logo_layout = QHBoxLayout()
+        logo_layout.addStretch()
+        
+        logo_label = QLabel()
+        if os.path.exists(self.logo_path):
+            logo_pixmap = QPixmap(self.logo_path)
+            # Scale logo to reasonable size
+            logo_pixmap = logo_pixmap.scaled(100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_label.setPixmap(logo_pixmap)
+        else:
+            logo_label.setText("Logo not found")
+            logo_label.setStyleSheet(f"color: {AppColors.PRIMARY}; font-weight: bold;")
+        
+        logo_layout.addWidget(logo_label)
+        logo_layout.addStretch()
+        header_layout.addLayout(logo_layout)
+        
+        # Tagline
+        tagline_label = QLabel("A Karun Pant Creation")
+        tagline_label.setAlignment(Qt.AlignCenter)
+        
+        # Style the tagline to match the primary color
+        font = QFont("Arial", 12)
+        font.setBold(True)
+        tagline_label.setFont(font)
+        tagline_label.setStyleSheet(f"color: {AppColors.PRIMARY}; margin-top: 5px;")
+        
+        header_layout.addWidget(tagline_label)
+        main_layout.addWidget(header_widget)
         
         # Input section
         input_group = QGroupBox("Input Settings")
         input_layout = QVBoxLayout(input_group)
+        input_layout.setSpacing(10)
         
         # GIF input
         gif_layout = QHBoxLayout()
-        gif_layout.addWidget(QLabel("Input GIF:"))
+        gif_label = QLabel("Input GIF:")
+        gif_label.setMinimumWidth(80)
+        gif_layout.addWidget(gif_label)
+        
         self.gif_entry = QLineEdit()
         gif_layout.addWidget(self.gif_entry)
+        
         gif_browse_btn = QPushButton("Browse...")
+        gif_browse_btn.setFixedWidth(100)
         gif_browse_btn.clicked.connect(self.browse_gif)
         gif_layout.addWidget(gif_browse_btn)
+        
         input_layout.addLayout(gif_layout)
         
         # Frame image
         frame_layout = QHBoxLayout()
-        frame_layout.addWidget(QLabel("Frame Image:"))
+        frame_label = QLabel("Frame Image:")
+        frame_label.setMinimumWidth(80)
+        frame_layout.addWidget(frame_label)
+        
         self.frame_entry = QLineEdit()
         self.frame_entry.setText(self.frame_path)
         frame_layout.addWidget(self.frame_entry)
+        
         frame_browse_btn = QPushButton("Browse...")
+        frame_browse_btn.setFixedWidth(100)
         frame_browse_btn.clicked.connect(self.browse_frame)
         frame_layout.addWidget(frame_browse_btn)
-        input_layout.addLayout(frame_layout)
         
+        input_layout.addLayout(frame_layout)
         main_layout.addWidget(input_group)
         
         # Output section
         output_group = QGroupBox("Output Settings")
         output_layout = QVBoxLayout(output_group)
+        output_layout.setSpacing(10)
         
         output_file_layout = QHBoxLayout()
-        output_file_layout.addWidget(QLabel("Output GIF:"))
+        output_label = QLabel("Output GIF:")
+        output_label.setMinimumWidth(80)
+        output_file_layout.addWidget(output_label)
+        
         self.output_entry = QLineEdit()
         self.output_entry.setText(self.output_path)
         output_file_layout.addWidget(self.output_entry)
+        
         output_browse_btn = QPushButton("Browse...")
+        output_browse_btn.setFixedWidth(100)
         output_browse_btn.clicked.connect(self.browse_output)
         output_file_layout.addWidget(output_browse_btn)
-        output_layout.addLayout(output_file_layout)
         
+        output_layout.addLayout(output_file_layout)
         main_layout.addWidget(output_group)
         
         # Progress section
-        progress_layout = QVBoxLayout()
+        progress_group = QGroupBox("Progress")
+        progress_layout = QVBoxLayout(progress_group)
+        progress_layout.setSpacing(10)
+        
         self.progress_bar = QProgressBar()
         progress_layout.addWidget(self.progress_bar)
         
-        self.status_label = QLabel("Ready")
+        self.status_label = QLabel("Ready to process")
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setStyleSheet(f"font-weight: bold; color: {AppColors.PRIMARY};")
         progress_layout.addWidget(self.status_label)
         
-        main_layout.addLayout(progress_layout)
+        main_layout.addWidget(progress_group)
         
         # Action buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
         process_btn = QPushButton("Process GIF")
+        process_btn.setMinimumWidth(150)
+        process_btn.setMinimumHeight(40)
         process_btn.clicked.connect(self.process_gif)
         button_layout.addWidget(process_btn)
         
@@ -287,29 +457,54 @@ class FrameGifApp(QMainWindow):
     
     def processing_complete(self, output_path, elapsed_time):
         self.status_label.setText(f"Done! Processing time: {elapsed_time:.2f} seconds")
-        QMessageBox.information(self, "Success", f"GIF successfully processed and saved to:\n{output_path}")
+        self.status_label.setStyleSheet(f"font-weight: bold; color: {AppColors.SUCCESS};")
         
-        # Open the processed GIF with the system's default application
-        self.open_with_default_app(output_path)
+        # Create a custom message box with an option to open the folder
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setWindowTitle("Success")
+        msg_box.setText(f"GIF successfully processed and saved to:\n{output_path}")
+        
+        # Add a button to open the containing folder
+        open_folder_btn = msg_box.addButton("Go to File", QMessageBox.ActionRole)
+        close_btn = msg_box.addButton(QMessageBox.Close)
+        
+        msg_box.exec_()
+        
+        # Check which button was clicked
+        if msg_box.clickedButton() == open_folder_btn:
+            self.open_containing_folder(output_path)
     
     def processing_error(self, error_message):
         self.status_label.setText("Error occurred during processing.")
+        self.status_label.setStyleSheet(f"font-weight: bold; color: {AppColors.ERROR};")
+        
         QMessageBox.critical(self, "Error", f"Error processing GIF: {error_message}")
     
-    def open_with_default_app(self, file_path):
-        """Open the file with the system's default application"""
+    def open_containing_folder(self, file_path):
+        """Open the folder containing the file"""
         try:
+            folder_path = os.path.dirname(os.path.abspath(file_path))
+            
             if sys.platform == 'win32':
-                os.startfile(file_path)
+                # On Windows, use explorer to open the folder
+                subprocess.run(['explorer', folder_path])
             elif sys.platform == 'darwin':  # macOS
-                subprocess.call(['open', file_path])
+                # On macOS, use 'open' command
+                subprocess.run(['open', folder_path])
             else:  # Linux and other Unix-like
-                subprocess.call(['xdg-open', file_path])
+                # On Linux, use xdg-open
+                subprocess.run(['xdg-open', folder_path])
+                
         except Exception as e:
-            QMessageBox.warning(self, "Warning", f"Could not open the file with default application: {str(e)}")
+            QMessageBox.warning(self, "Warning", f"Could not open the containing folder: {str(e)}")
 
 def main():
     app = QApplication(sys.argv)
+    
+    # Set application style
+    app.setStyle("Fusion")
+    
     window = FrameGifApp()
     window.show()
     sys.exit(app.exec_())

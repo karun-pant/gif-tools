@@ -25,9 +25,8 @@ jobs:
     
      - name: Build Mac App
        run: |
-         pyinstaller frame-tool/FrameGifTool.spec
-         cd dist
-         zip -r FrameGifTool-Mac.zip FrameGifTool.app
+         chmod +x ./makeBuild.sh
+         ./makeBuild.sh
     
      - name: Create Release
        id: create_release
