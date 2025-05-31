@@ -14,7 +14,7 @@ cd gif-tools
 ./make_mac_app.sh
 ```
 
-## Mac App
+### Mac App
 
 - A standalone Mac application is available for download from the [releases page](https://github.com/karun-pant/gif-tools/releases).
 - If it doesn't work as expected, follow the steps after downloading the code.
