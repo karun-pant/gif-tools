@@ -31,7 +31,21 @@ jobs:
     
      - name: Build Mac App
        run: |
-         pyinstaller frame-tools/FrameGifTool.spec
+         # List directories to debug
+         ls -la
+         # Check if the spec file exists in the root directory
+         ls -la *.spec || echo "No spec files in root directory"
+         # Check if frame-tools directory exists and list its contents
+         if [ -d "frame-tools" ]; then
+           ls -la frame-tools/
+           ls -la frame-tools/*.spec || echo "No spec files in frame-tools directory"
+         else
+           echo "frame-tools directory does not exist"
+         fi
+         # Try to find the spec file anywhere in the repository
+         find . -name "*.spec"
+         # Use the correct path to the spec file based on the find results
+         pyinstaller FrameGifTool.spec
          cd dist
          zip -r FrameGifTool-Mac.zip FrameGifTool.app
     
