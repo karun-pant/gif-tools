@@ -11,6 +11,7 @@ A simple tool for framing GIFs with device frames.
 ```bash
 git clone https://github.com/karun-pant/gif-tools.git
 cd gif-tools
+chmod 777 make_mac_app.sh
 ./make_mac_app.sh
 ```
 
