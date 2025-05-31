@@ -1,8 +1,6 @@
 name: Build Mac App
 
 on:
-  release:
-    types: [created]
   push:
     branches:
       - main
@@ -10,6 +8,8 @@ on:
     branches:
       - main
     types: [closed]
+  release:
+    types: [created]
 
 jobs:
    build:
@@ -17,6 +17,8 @@ jobs:
     
      steps:
      - uses: actions/checkout@v2
+       with:
+         fetch-depth: 0  # Fetch all history for tags
     
      - name: Set up Python
        uses: actions/setup-python@v2
@@ -29,27 +31,71 @@ jobs:
          pip install pyinstaller
          pip install -r requirements.txt
     
+     - name: Create Release (on push to main)
+       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+       id: create_release
+       run: |
+         # Get the latest version tag (format: v1.2.3)
+         git fetch --tags
+         LATEST_TAG=$(git tag -l "v*" | sort -V | tail -n 1)
+         
+         if [ -z "$LATEST_TAG" ]; then
+           # No existing tag, start with v0.1.0
+           NEW_TAG="v0.1.0"
+         else
+           # Extract version components
+           MAJOR=$(echo $LATEST_TAG | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\1/')
+           MINOR=$(echo $LATEST_TAG | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\2/')
+           PATCH=$(echo $LATEST_TAG | sed 's/v\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)/\3/')
+           
+           # Increment minor version
+           NEW_MINOR=$((MINOR + 1))
+           NEW_TAG="v$MAJOR.$NEW_MINOR.0"
+         fi
+         
+         echo "Creating new release with tag: $NEW_TAG"
+         echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+         
+         # Create a new release using GitHub API
+         curl -X POST \
+           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+           -H "Accept: application/vnd.github.v3+json" \
+           https://api.github.com/repos/${{ github.repository }}/releases \
+           -d "{\"tag_name\":\"$NEW_TAG\",\"name\":\"Release $NEW_TAG\",\"body\":\"Automated release $NEW_TAG\",\"draft\":false,\"prerelease\":false}"
+    
      - name: Build Mac App
        run: |
-         # List directories to debug
-         ls -la
-         # Check if the spec file exists in the root directory
-         ls -la *.spec || echo "No spec files in root directory"
-         # Check if frame-tools directory exists and list its contents
-         if [ -d "frame-tools" ]; then
-           ls -la frame-tools/
-           ls -la frame-tools/*.spec || echo "No spec files in frame-tools directory"
-         else
-           echo "frame-tools directory does not exist"
-         fi
-         # Try to find the spec file anywhere in the repository
+         # Find the spec file
          find . -name "*.spec"
-         # Use the correct path to the spec file based on the find results
+         # Use the correct path to the spec file
          pyinstaller FrameGifTool.spec
          cd dist
          zip -r FrameGifTool-Mac.zip FrameGifTool.app
+     
+     - name: Upload artifact
+       uses: actions/upload-artifact@v2
+       with:
+         name: FrameGifTool-Mac
+         path: ./dist/FrameGifTool-Mac.zip
     
-     - name: Upload Release Asset
+     - name: Upload Release Asset (on push to main)
+       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+       run: |
+         # Get the upload URL for the release we just created
+         RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+           https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.NEW_TAG }} | \
+           jq -r .id)
+         
+         # Upload the asset
+         curl -X POST \
+           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+           -H "Content-Type: application/zip" \
+           -H "Accept: application/vnd.github.v3+json" \
+           --data-binary @./dist/FrameGifTool-Mac.zip \
+           "https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=FrameGifTool-Mac.zip"
+    
+     - name: Upload Release Asset (on release created)
+       if: github.event_name == 'release'
        uses: actions/upload-release-asset@v1
        env:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
