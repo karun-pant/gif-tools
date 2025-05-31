@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtGui import QPixmap
 from PIL import Image, ImageDraw, ImageSequence
 import io
+import pkg_resources
 
 def add_rounded_corners(im, radius):
     circle = Image.new('L', (radius * 2, radius * 2), 0)
@@ -115,12 +116,36 @@ class FrameGifApp(QMainWindow):
         # Get the directory where the script is located
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         
-        # Default paths
-        self.frame_path = os.path.join(self.script_dir, 'frame.png')
+        # Try to find the frame.png in different locations
+        self.frame_path = self.find_frame_png()
         self.gif_path = ""
-        self.output_path = os.path.join(self.script_dir, 'framed.gif')
+        self.output_path = os.path.join(os.path.expanduser("~"), 'framed.gif')
         
         self.init_ui()
+        
+    def find_frame_png(self):
+        # First check if frame.png is in the current directory
+        local_frame = os.path.join(self.script_dir, 'frame.png')
+        if os.path.exists(local_frame):
+            return local_frame
+            
+        # Then check if it's available as a package resource
+        try:
+            frame_path = pkg_resources.resource_filename('frame_tool', 'frame.png')
+            if os.path.exists(frame_path):
+                return frame_path
+        except:
+            pass
+            
+        # If running as a bundled app, check relative to the executable
+        if getattr(sys, 'frozen', False):
+            bundle_dir = os.path.dirname(sys.executable)
+            bundled_frame = os.path.join(bundle_dir, 'frame.png')
+            if os.path.exists(bundled_frame):
+                return bundled_frame
+                
+        # Default to the current directory and show a warning later if not found
+        return os.path.join(self.script_dir, 'frame.png')
         
     def init_ui(self):
         self.setWindowTitle("GIF Framing Tool")
@@ -193,6 +218,11 @@ class FrameGifApp(QMainWindow):
         button_layout.addWidget(process_btn)
         
         main_layout.addLayout(button_layout)
+        
+        # Check if frame.png exists
+        if not os.path.exists(self.frame_path):
+            QMessageBox.warning(self, "Warning", 
+                "Default frame.png not found. Please select a frame image manually.")
     
     def browse_gif(self):
         file_path, _ = QFileDialog.getOpenFileName(
