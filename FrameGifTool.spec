@@ -5,7 +5,7 @@ block_cipher = None
 a = Analysis(['frameGif.py'],
              pathex=[],
              binaries=[],
-             datas=[('frame.png', 'logo.png', '.')],
+             datas=[('frame.png', '.'), ('logo.png', '.')],
              hiddenimports=[],
              hookspath=[],
              hooksconfig={},
@@ -44,7 +44,7 @@ coll = COLLECT(exe,
 
 app = BUNDLE(coll,
              name='FrameGifTool.app',
-             icon=None,
+             icon='logo.png',
              bundle_identifier='com.karunpant.framegiftool',
              info_plist={
                 'NSHighResolutionCapable': 'True',
