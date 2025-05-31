@@ -308,8 +308,11 @@ class FrameGifApp(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Warning", f"Could not open the file with default application: {str(e)}")
 
-if __name__ == "__main__":
+def main():
     app = QApplication(sys.argv)
     window = FrameGifApp()
     window.show()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()

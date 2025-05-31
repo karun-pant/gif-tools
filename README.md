@@ -1,94 +1,206 @@
-# GIF Framing Tool
+# Frame GIF Tool
 
-A simple tool for framing GIFs with device frames. This tool allows you to overlay animated GIFs onto a device frame image, creating a professional-looking presentation of your mobile app or website animations.
-
-## Features
-
-- Overlay animated GIFs onto device frames
-- Automatically resize GIFs to fit the frame
-- Apply rounded corners to match device screens
-- Simple and intuitive GUI interface
-- Cross-platform (Windows, macOS, Linux)
+A simple tool for framing GIFs with device frames.
 
 ## Installation
 
-### Option 1: Download the Executable (Recommended for most users)
-
-1. Download the latest release from the [Releases](https://github.com/karun-pant/gif-tools/releases) page
-2. Extract the zip file to a location of your choice
-3. Run the executable:
-   - Windows: Double-click `FrameGifTool.exe`
-   - macOS: Right-click on `FrameGifTool`, select "Open" (you may need to approve it in Security settings)
-   - Linux: Make the file executable with `chmod +x FrameGifTool` and then run it with `./FrameGifTool`
-
-### Option 2: Install as a Python Package
-
-If you have Python installed (3.6 or later), you can install the tool as a package:
+### Using pip
 
 ```bash
 pip install frame-gif-tool
 ```
 
-Then run it with:
+### From source
 
+```bash
+git clone https://github.com/karun-pant/gif-tools.git
+cd gif-tools
+pip install -e .
+```
+
+## Usage
+
+After installation, you can run the tool in two ways:
+
+1. Command line:
 ```bash
 frame-gif
 ```
 
-### Option 3: Run from Source
+2. As an application:
+```bash
+frame-gif-app
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/karun-pant/gif-tools.git
-   cd gif-tools/frame-tool
-   ```
+## Features
 
-2. Install the required dependencies:
-   ```bash
-   pip install PyQt5 Pillow
-   ```
+- Load any GIF and overlay it on a device frame
+- Automatically resizes GIF to fit the frame
+- Adds rounded corners to match device aesthetics
+- Saves the framed GIF to your desired location
 
-3. Run the script:
-   ```bash
-   python frameGif.py
-   ```
+## Mac App
 
-## Usage
-
-1. Launch the GIF Framing Tool
-2. Select your input GIF using the "Browse..." button
-3. (Optional) Choose a custom frame image, or use the default frame
-4. Specify the output location for your framed GIF
-5. Click "Process GIF" to start the framing process
-6. Once complete, the framed GIF will automatically open in your default image viewer
-
-## Building from Source
-
-If you want to build the executable yourself:
-
-1. Install PyInstaller:
-   ```bash
-   pip install pyinstaller
-   ```
-
-2. Run the build script:
-   ```bash
-   python build_app.py
-   ```
-
-3. Find the executable in the `dist` folder
-
-## Requirements
-
-- Python 3.6 or higher (for running from source or as a package)
-- PyQt5
-- Pillow (PIL Fork)
+A standalone Mac application is available for download from the [releases page](https://github.com/karun-pant/gif-tools/releases).
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT
+```
 
-## Acknowledgments
+3. Create a LICENSE file:
 
-- The default frame image is designed for demonstration purposes
-- For best results, use GIFs that match the aspect ratio of the device screen
+```bash
+touch LICENSE
+```
+
+4. Add MIT license content:
+
+```text:LICENSE
+MIT License
+
+Copyright (c) 2023 Karun Pant
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## 5. Create a MANIFEST.in file
+
+```bash
+touch MANIFEST.in
+```
+
+Add content:
+
+```text:MANIFEST.in
+include LICENSE
+include README.md
+include frame.png
+```
+
+## 6. Distribution Steps
+
+### A. PyPI Distribution
+
+1. Install build tools:
+
+```bash
+pip install build twine
+```
+
+2. Build the package:
+
+```bash
+python -m build
+```
+
+3. Upload to PyPI:
+
+```bash
+python -m twine upload dist/*
+```
+
+### B. GitHub Distribution
+
+1. Create a GitHub repository if you don't have one already
+2. Initialize git and push your code:
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/karun-pant/gif-tools.git
+git push -u origin main
+```
+
+3. Create a GitHub release with the Mac app:
+
+```bash
+# Compress the Mac app for distribution
+cd dist
+zip -r FrameGifTool-Mac.zip FrameGifTool.app
+```
+
+4. Go to GitHub, create a new release, and upload the `FrameGifTool-Mac.zip` file.
+
+## 7. GitHub Actions for Automated Builds (Optional)
+
+Create a GitHub Actions workflow to automatically build the Mac app:
+
+```bash
+mkdir -p .github/workflows
+touch .github/workflows/build-mac-app.yml
+```
+
+Add content:
+
+```yaml:.github/workflows/build-mac-app.yml
+name: Build Mac App
+
+on:
+   push:
+     tags:
+       - 'v*'
+
+jobs:
+   build:
+     runs-on: macos-latest
+    
+     steps:
+     - uses: actions/checkout@v2
+    
+     - name: Set up Python
+       uses: actions/setup-python@v2
+       with:
+         python-version: '3.9'
+    
+     - name: Install dependencies
+       run: |
+         python -m pip install --upgrade pip
+         pip install pyinstaller
+         pip install -e .
+    
+     - name: Build Mac App
+       run: |
+         pyinstaller FrameGifTool.spec
+         cd dist
+         zip -r FrameGifTool-Mac.zip FrameGifTool.app
+    
+     - name: Create Release
+       id: create_release
+       uses: actions/create-release@v1
+       env:
+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       with:
+         tag_name: ${{ github.ref }}
+         release_name: Release ${{ github.ref }}
+         draft: false
+         prerelease: false
+    
+     - name: Upload Release Asset
+       uses: actions/upload-release-asset@v1
+       env:
+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       with:
+         upload_url: ${{ steps.create_release.outputs.upload_url }}
+         asset_path: ./dist/FrameGifTool-Mac.zip
+         asset_name: FrameGifTool-Mac.zip
+         asset_content_type: application/zip
+```

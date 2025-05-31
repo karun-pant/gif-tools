@@ -10,6 +10,7 @@ from setuptools.command.egg_info import egg_info
 NAME = "frame-gif-tool"
 VERSION = "1.0.0"
 DESCRIPTION = "A tool for framing GIFs with device frames"
+LONG_DESCRIPTION = open("README.md").read() if os.path.exists("README.md") else DESCRIPTION
 AUTHOR = "Karun Pant"
 AUTHOR_EMAIL = ""
 URL = "https://github.com/karun-pant/gif-tools"
@@ -61,6 +62,8 @@ setup(
     name=NAME,
     version=VERSION,
     description=DESCRIPTION,
+    long_description=LONG_DESCRIPTION,
+    long_description_content_type="text/markdown",
     author=AUTHOR,
     author_email=AUTHOR_EMAIL,
     url=URL,
@@ -74,10 +77,28 @@ setup(
         'console_scripts': [
             'frame-gif=frame_tool.frameGif:main',
         ],
+        'gui_scripts': [
+            'frame-gif-app=frame_tool.frameGif:main',
+        ],
     },
     cmdclass={
         'install': CustomInstallCommand,
         'develop': CustomDevelopCommand,
         'egg_info': CustomEggInfoCommand,
     },
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: End Users/Desktop',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Operating System :: MacOS :: MacOS X',
+        'Operating System :: Microsoft :: Windows',
+        'Operating System :: POSIX :: Linux',
+        'Topic :: Multimedia :: Graphics',
+    ],
+    python_requires='>=3.6',
 )
