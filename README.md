@@ -1,7 +1,8 @@
 # Frame GIF Tool
 
 A simple tool for framing GIFs with device frames.
-[Frame Gif Tool Logo](logo.png)
+
+<img src="logo.png" width="100" alt="Logo">
 
 ## Installation
 
@@ -19,7 +20,9 @@ cd gif-tools
 - If it doesn't work as expected, follow the steps after downloading the code.
 - Also, please report issues on the GitHub repository.
 
-[Preview](app_preview.png)
+
+
+<img src="app_preview.png" width="300" alt="App Preview">
 
 ## Features
 
