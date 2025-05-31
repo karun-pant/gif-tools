@@ -1,42 +1,15 @@
-from PIL import Image, ImageDraw, ImageSequence
-import sys
 import os
+import sys
 import time
 import threading
-
-# ANSI color codes
-class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-def colored(text, color):
-    """Add color to text"""
-    return f"{color}{text}{Colors.ENDC}"
-
-def print_progress_bar(iteration, total, prefix='', suffix='', length=50, color=Colors.BLUE):
-    percent = f"{100 * (iteration / float(total)):.1f}"
-    filled_length = int(length * iteration // total)
-    bar = colored('█' * filled_length, color) + '-' * (length - filled_length)
-    print(f'\r{prefix} |{bar}| {colored(percent + "%", color)} {suffix}', end='\r')
-    if iteration == total:
-        print()  # New line on complete
-
-def animated_loading(stop_event, message="Processing", color=Colors.CYAN):
-    """Display an animated loading indicator"""
-    animation = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"  # More elegant spinner
-    idx = 0
-    while not stop_event.is_set():
-        print(f"\r{colored(message, color)} {colored(animation[idx % len(animation)], color)}", end="")
-        idx += 1
-        time.sleep(0.1)
-    print("\r" + " " * (len(message) + 2), end="\r")  # Clear the line
+import subprocess
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+                            QLabel, QLineEdit, QPushButton, QProgressBar, QFileDialog, 
+                            QMessageBox, QGroupBox)
+from PyQt5.QtCore import Qt, pyqtSignal, QObject
+from PyQt5.QtGui import QPixmap
+from PIL import Image, ImageDraw, ImageSequence
+import io
 
 def add_rounded_corners(im, radius):
     circle = Image.new('L', (radius * 2, radius * 2), 0)
@@ -51,50 +24,81 @@ def add_rounded_corners(im, radius):
     im.putalpha(alpha)
     return im
 
-def resize_gif_frames(input_gif):
-    target_size = (2257, 4854)
-    with Image.open(input_gif) as im:
-        frames = []
-        total_frames = im.n_frames
-        print(colored("Resizing GIF frames:", Colors.HEADER))
-        for i, frame in enumerate(ImageSequence.Iterator(im), start=1):
-            frame = frame.convert("RGBA")
-            frame = frame.resize(target_size, Image.Resampling.LANCZOS)
-            frames.append(frame)
-            print_progress_bar(i, total_frames, color=Colors.BLUE)
-    return frames
+class WorkerSignals(QObject):
+    progress = pyqtSignal(int)
+    status = pyqtSignal(str)
+    finished = pyqtSignal(str, float)
+    error = pyqtSignal(str)
 
-def overlay_gif_on_frame(frame_path, gif_frames, output_path):
-    radius = 275
-    frame = Image.open(frame_path).convert("RGBA")
-    frame_w, frame_h = frame.size
-
-    processed_frames = []
-    total_frames = len(gif_frames)
-    print(colored("Overlaying frames on background:", Colors.HEADER))
-    for i, gif_frame in enumerate(gif_frames, start=1):
-        gif_frame = add_rounded_corners(gif_frame, radius)
-
-        canvas = Image.new("RGBA", (frame_w, frame_h), (0, 0, 0, 0))
-        gif_w, gif_h = gif_frame.size
-        pos_x = (frame_w - gif_w) // 2
-        pos_y = (frame_h - gif_h) // 2
-        canvas.paste(gif_frame, (pos_x, pos_y), gif_frame)
-
-        combined = Image.alpha_composite(frame, canvas)
-        processed_frames.append(combined)
-
-        print_progress_bar(i, total_frames, color=Colors.CYAN)
-
-    print(colored("Saving output GIF...", Colors.HEADER))
+class GifProcessor(threading.Thread):
+    def __init__(self, gif_path, frame_path, output_path):
+        super().__init__()
+        self.gif_path = gif_path
+        self.frame_path = frame_path
+        self.output_path = output_path
+        self.signals = WorkerSignals()
+        
+    def run(self):
+        try:
+            start_time = time.time()
+            
+            # Resize GIF frames
+            self.signals.status.emit("Resizing GIF frames...")
+            gif_frames = self.resize_gif_frames(self.gif_path)
+            
+            # Overlay on frame
+            self.signals.status.emit("Overlaying frames on background...")
+            self.overlay_gif_on_frame(self.frame_path, gif_frames, self.output_path)
+            
+            elapsed_time = time.time() - start_time
+            self.signals.finished.emit(self.output_path, elapsed_time)
+            
+        except Exception as e:
+            self.signals.error.emit(str(e))
     
-    # Start the loading animation in a separate thread
-    stop_event = threading.Event()
-    loading_thread = threading.Thread(target=animated_loading, args=(stop_event, "Saving GIF", Colors.YELLOW))
-    loading_thread.daemon = True
-    loading_thread.start()
+    def resize_gif_frames(self, input_gif):
+        target_size = (2257, 4854)
+        with Image.open(input_gif) as im:
+            frames = []
+            total_frames = im.n_frames
+            
+            for i, frame in enumerate(ImageSequence.Iterator(im), start=1):
+                frame = frame.convert("RGBA")
+                frame = frame.resize(target_size, Image.Resampling.LANCZOS)
+                frames.append(frame)
+                
+                # Update progress (first half of the process)
+                progress = int((i / total_frames) * 50)
+                self.signals.progress.emit(progress)
+        
+        return frames
     
-    try:
+    def overlay_gif_on_frame(self, frame_path, gif_frames, output_path):
+        radius = 275
+        frame = Image.open(frame_path).convert("RGBA")
+        frame_w, frame_h = frame.size
+
+        processed_frames = []
+        total_frames = len(gif_frames)
+        
+        for i, gif_frame in enumerate(gif_frames, start=1):
+            gif_frame = add_rounded_corners(gif_frame, radius)
+
+            canvas = Image.new("RGBA", (frame_w, frame_h), (0, 0, 0, 0))
+            gif_w, gif_h = gif_frame.size
+            pos_x = (frame_w - gif_w) // 2
+            pos_y = (frame_h - gif_h) // 2
+            canvas.paste(gif_frame, (pos_x, pos_y), gif_frame)
+
+            combined = Image.alpha_composite(frame, canvas)
+            processed_frames.append(combined)
+            
+            # Update progress (second half of the process)
+            progress = 50 + int((i / total_frames) * 50)
+            self.signals.progress.emit(progress)
+        
+        self.signals.status.emit("Saving output GIF...")
+        
         processed_frames[0].save(
             output_path,
             save_all=True,
@@ -103,72 +107,179 @@ def overlay_gif_on_frame(frame_path, gif_frames, output_path):
             duration=100,
             loop=0
         )
-    finally:
-        # Stop the loading animation
-        stop_event.set()
-        loading_thread.join()
-        
-    print(colored("Done saving output GIF.", Colors.GREEN))
 
-def get_valid_file_path(prompt, file_must_exist=True):
-    while True:
-        file_path = input(colored(prompt, Colors.YELLOW))
-        file_path = file_path.strip()
+class FrameGifApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
         
-        # If user just presses Enter, return None to use default
-        if not file_path:
-            return None
-            
-        # Check if file exists if required
-        if file_must_exist and not os.path.exists(file_path):
-            print(colored(f"Error: File '{file_path}' does not exist. Please enter a valid path.", Colors.RED))
-            continue
-            
-        return file_path
-
-def main():
-    # Print a nice header
-    print(colored("\n╔═══════════════════════════════════════╗", Colors.CYAN))
-    print(colored("║        GIF FRAMING TOOL               ║", Colors.CYAN))
-    print(colored("╚═══════════════════════════════════════╝\n", Colors.CYAN))
+        # Get the directory where the script is located
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Default paths
+        self.frame_path = os.path.join(self.script_dir, 'frame.png')
+        self.gif_path = ""
+        self.output_path = os.path.join(self.script_dir, 'framed.gif')
+        
+        self.init_ui()
+        
+    def init_ui(self):
+        self.setWindowTitle("GIF Framing Tool")
+        self.setMinimumSize(600, 300)  # Reduced size since we removed the preview
+        
+        # Main widget and layout
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QVBoxLayout(main_widget)
+        
+        # Input section
+        input_group = QGroupBox("Input Settings")
+        input_layout = QVBoxLayout(input_group)
+        
+        # GIF input
+        gif_layout = QHBoxLayout()
+        gif_layout.addWidget(QLabel("Input GIF:"))
+        self.gif_entry = QLineEdit()
+        gif_layout.addWidget(self.gif_entry)
+        gif_browse_btn = QPushButton("Browse...")
+        gif_browse_btn.clicked.connect(self.browse_gif)
+        gif_layout.addWidget(gif_browse_btn)
+        input_layout.addLayout(gif_layout)
+        
+        # Frame image
+        frame_layout = QHBoxLayout()
+        frame_layout.addWidget(QLabel("Frame Image:"))
+        self.frame_entry = QLineEdit()
+        self.frame_entry.setText(self.frame_path)
+        frame_layout.addWidget(self.frame_entry)
+        frame_browse_btn = QPushButton("Browse...")
+        frame_browse_btn.clicked.connect(self.browse_frame)
+        frame_layout.addWidget(frame_browse_btn)
+        input_layout.addLayout(frame_layout)
+        
+        main_layout.addWidget(input_group)
+        
+        # Output section
+        output_group = QGroupBox("Output Settings")
+        output_layout = QVBoxLayout(output_group)
+        
+        output_file_layout = QHBoxLayout()
+        output_file_layout.addWidget(QLabel("Output GIF:"))
+        self.output_entry = QLineEdit()
+        self.output_entry.setText(self.output_path)
+        output_file_layout.addWidget(self.output_entry)
+        output_browse_btn = QPushButton("Browse...")
+        output_browse_btn.clicked.connect(self.browse_output)
+        output_file_layout.addWidget(output_browse_btn)
+        output_layout.addLayout(output_file_layout)
+        
+        main_layout.addWidget(output_group)
+        
+        # Progress section
+        progress_layout = QVBoxLayout()
+        self.progress_bar = QProgressBar()
+        progress_layout.addWidget(self.progress_bar)
+        
+        self.status_label = QLabel("Ready")
+        progress_layout.addWidget(self.status_label)
+        
+        main_layout.addLayout(progress_layout)
+        
+        # Action buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        process_btn = QPushButton("Process GIF")
+        process_btn.clicked.connect(self.process_gif)
+        button_layout.addWidget(process_btn)
+        
+        main_layout.addLayout(button_layout)
     
-    # Get the directory where the script is located
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    def browse_gif(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Input GIF", "", "GIF files (*.gif);;All files (*.*)"
+        )
+        if file_path:
+            self.gif_path = file_path
+            self.gif_entry.setText(file_path)
     
-    # Default paths
-    frame_path = os.path.join(script_dir, 'frame.png')
-    default_gif_path = 'plain_output.gif'
-    output_path = 'framed.gif'
+    def browse_frame(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Frame Image", "", "PNG files (*.png);;All files (*.*)"
+        )
+        if file_path:
+            self.frame_path = file_path
+            self.frame_entry.setText(file_path)
     
-    # Ask for GIF path
-    print(colored(f"Default GIF path: {default_gif_path}", Colors.BLUE))
-    gif_path = get_valid_file_path("Enter path to input GIF file (or press Enter for default): ", True)
-    if not gif_path:
-        gif_path = default_gif_path
-        if not os.path.exists(gif_path):
-            print(colored(f"Error: Default GIF file not found at '{gif_path}'", Colors.RED))
+    def browse_output(self):
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Output GIF", "", "GIF files (*.gif);;All files (*.*)"
+        )
+        if file_path:
+            self.output_path = file_path
+            self.output_entry.setText(file_path)
+    
+    def process_gif(self):
+        # Get the current values from entries
+        self.gif_path = self.gif_entry.text()
+        self.frame_path = self.frame_entry.text()
+        self.output_path = self.output_entry.text()
+        
+        # Validate inputs
+        if not self.gif_path or not os.path.exists(self.gif_path):
+            QMessageBox.critical(self, "Error", "Please select a valid input GIF file.")
             return
+            
+        if not self.frame_path or not os.path.exists(self.frame_path):
+            QMessageBox.critical(self, "Error", "Please select a valid frame image file.")
+            return
+            
+        if not self.output_path:
+            QMessageBox.critical(self, "Error", "Please specify an output path.")
+            return
+        
+        # Reset progress
+        self.progress_bar.setValue(0)
+        self.status_label.setText("Starting processing...")
+        
+        # Start processing in a separate thread
+        self.processor = GifProcessor(self.gif_path, self.frame_path, self.output_path)
+        self.processor.signals.progress.connect(self.update_progress)
+        self.processor.signals.status.connect(self.update_status)
+        self.processor.signals.finished.connect(self.processing_complete)
+        self.processor.signals.error.connect(self.processing_error)
+        self.processor.start()
     
-    print(colored("\nProcessing with:", Colors.HEADER))
-    print(colored(f"Frame: {frame_path}", Colors.GREEN))
-    print(colored(f"Input GIF: {gif_path}", Colors.GREEN))
-    print(colored(f"Output: {output_path}", Colors.GREEN))
-    print()
+    def update_progress(self, value):
+        self.progress_bar.setValue(value)
     
-    # Process the GIF
-    try:
-        start_time = time.time()
-        gif_frames = resize_gif_frames(gif_path)
-        overlay_gif_on_frame(frame_path, gif_frames, output_path)
-        elapsed_time = time.time() - start_time
-        print(colored(f"✓ Successfully created framed GIF at: {output_path}", Colors.GREEN))
-        print(colored(f"Total processing time: {elapsed_time:.2f} seconds", Colors.BLUE))
-    except Exception as e:
-        print(colored(f"Error processing GIF: {str(e)}", Colors.RED))
+    def update_status(self, message):
+        self.status_label.setText(message)
+    
+    def processing_complete(self, output_path, elapsed_time):
+        self.status_label.setText(f"Done! Processing time: {elapsed_time:.2f} seconds")
+        QMessageBox.information(self, "Success", f"GIF successfully processed and saved to:\n{output_path}")
+        
+        # Open the processed GIF with the system's default application
+        self.open_with_default_app(output_path)
+    
+    def processing_error(self, error_message):
+        self.status_label.setText("Error occurred during processing.")
+        QMessageBox.critical(self, "Error", f"Error processing GIF: {error_message}")
+    
+    def open_with_default_app(self, file_path):
+        """Open the file with the system's default application"""
+        try:
+            if sys.platform == 'win32':
+                os.startfile(file_path)
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.call(['open', file_path])
+            else:  # Linux and other Unix-like
+                subprocess.call(['xdg-open', file_path])
+        except Exception as e:
+            QMessageBox.warning(self, "Warning", f"Could not open the file with default application: {str(e)}")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print(colored("\nProcess interrupted by user. Exiting...", Colors.YELLOW))
-        sys.exit(0)
+    app = QApplication(sys.argv)
+    window = FrameGifApp()
+    window.show()
+    sys.exit(app.exec_())
