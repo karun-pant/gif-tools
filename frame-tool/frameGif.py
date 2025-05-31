@@ -136,7 +136,7 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Default paths
-    frame_path = 'frame.png'
+    frame_path = os.path.join(script_dir, 'frame.png')
     default_gif_path = 'plain_output.gif'
     output_path = 'framed.gif'
     
