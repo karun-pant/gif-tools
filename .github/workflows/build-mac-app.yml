@@ -11,17 +11,23 @@ on:
   release:
     types: [created]
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
    build:
      runs-on: macos-latest
     
      steps:
-     - uses: actions/checkout@v2
+
+     - uses: actions/checkout@v3
        with:
          fetch-depth: 0  # Fetch all history for tags
     
      - name: Set up Python
-       uses: actions/setup-python@v2
+
+       uses: actions/setup-python@v4
        with:
          python-version: '3.9'
     
@@ -73,26 +79,31 @@ jobs:
          zip -r FrameGifTool-Mac.zip FrameGifTool.app
      
      - name: Upload artifact
-       uses: actions/upload-artifact@v2
+
+       uses: actions/upload-artifact@v3
        with:
          name: FrameGifTool-Mac
          path: ./dist/FrameGifTool-Mac.zip
     
      - name: Upload Release Asset (on push to main)
        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-       run: |
-         # Get the upload URL for the release we just created
-         RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-           https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.NEW_TAG }} | \
-           jq -r .id)
-         
-         # Upload the asset
-         curl -X POST \
-           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-           -H "Content-Type: application/zip" \
-           -H "Accept: application/vnd.github.v3+json" \
-           --data-binary @./dist/FrameGifTool-Mac.zip \
-           "https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=FrameGifTool-Mac.zip"
+
+
+
+
+
+
+
+
+
+
+
+
+
+       uses: softprops/action-gh-release@v1
+       with:
+         files: ./dist/FrameGifTool-Mac.zip
+         tag_name: ${{ env.NEW_TAG }}
     
      - name: Upload Release Asset (on release created)
        if: github.event_name == 'release'
