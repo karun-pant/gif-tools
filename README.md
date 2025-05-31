@@ -1,4 +1,4 @@
-# GifEdit Frame Project
+# gif-tools Project
 
 This project overlays a GIF onto a custom frame image, allowing you to set the frame size and corner radius.
 
