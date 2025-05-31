@@ -137,7 +137,6 @@ if """ + repr(system == "Darwin") + """:
     app = BUNDLE(
         coll,
         name='GIF Framing Tool.app',
-
         icon=""" + (f"'{icon_path}'" if icon_path else "None") + """,
         bundle_identifier='com.karunpant.gifframingtool',
         info_plist={

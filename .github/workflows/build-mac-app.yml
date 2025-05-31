@@ -31,18 +31,26 @@ jobs:
      - name: Install dependencies
        run: |
          python -m pip install --upgrade pip
-         pip install pyinstaller
          pip install -r requirements.txt
+    
+     - name: Check for required files
+       run: |
+         if [ ! -f "logo.png" ]; then
+           echo "Warning: logo.png not found in the current directory."
+           echo "The application will be built without a custom icon."
+         fi
+        
+         if [ ! -f "frame.png" ]; then
+           echo "Warning: frame.png not found in the current directory."
+           echo "The application will need a frame image to be selected manually."
+         fi
     
      - name: Build Mac App
        run: |
-         # Find the spec file
-         find . -name "*.spec"
-         # Use the correct path to the spec file
-         pyinstaller FrameGifTool.spec
+         python3 build_app.py
          cd dist
-         zip -r FrameGifTool-Mac.zip FrameGifTool.app
-         echo "ZIP_PATH=$(pwd)/FrameGifTool-Mac.zip" >> $GITHUB_ENV
+         zip -r GIF-Framing-Tool-Mac.zip "GIF Framing Tool.app"
+         echo "ZIP_PATH=$(pwd)/GIF-Framing-Tool-Mac.zip" >> $GITHUB_ENV
          cd ..
      
      - name: Upload to Release (on push to main)
@@ -60,3 +68,9 @@ jobs:
          gh release upload ${{ github.event.release.tag_name }} ${{ env.ZIP_PATH }}
        env:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+     - name: Upload Artifact
+       uses: actions/upload-artifact@v3
+       with:
+         name: GIF-Framing-Tool-Mac
+         path: ${{ env.ZIP_PATH }}
