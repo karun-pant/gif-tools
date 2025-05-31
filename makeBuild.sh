@@ -4,7 +4,7 @@ pip install pyinstaller
 cd frame-tool 
 
 # Build the app using the spec file
-pyinstaller frame-tool/FrameGifTool.spec
+pyinstaller FrameGifTool.spec
 
 # The app will be created in the dist directory
 # You can zip it for distribution
