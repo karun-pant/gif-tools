@@ -23,7 +23,7 @@ chmod 777 make_mac_app.sh
 
 
 
-<img src="preview.png" width="300" alt="App Preview">
+<img src="preview.png" width="400" alt="App Preview">
 
 ## Features
 
